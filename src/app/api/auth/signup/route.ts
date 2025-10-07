@@ -4,9 +4,12 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Signup attempt started')
     const { email, password, name } = await request.json()
+    console.log('Signup request for email:', email)
 
     if (!email || !password) {
+      console.log('Missing email or password')
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -29,6 +32,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create user
+    console.log('Creating new user...')
     const user = await prisma.user.create({
       data: {
         email,
@@ -36,6 +40,7 @@ export async function POST(request: NextRequest) {
         name: name || null,
       }
     })
+    console.log('User created successfully:', user.email)
 
     // Don't return password
     const { password: _, ...userWithoutPassword } = user
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
       user: userWithoutPassword
     })
   } catch (error) {
-    console.error('Signup error:', error)
+    console.error('Signup error details:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

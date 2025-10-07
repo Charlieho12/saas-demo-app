@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -12,34 +13,45 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          console.log('Auth attempt for email:', credentials?.email)
+          
+          if (!credentials?.email || !credentials?.password) {
+            console.log('Missing credentials')
+            return null
           }
-        })
 
-        if (!user || !user.password) {
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email
+            }
+          })
+
+          if (!user || !user.password) {
+            console.log('User not found or no password')
+            return null
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
+
+          if (!isPasswordValid) {
+            console.log('Invalid password')
+            return null
+          }
+
+          console.log('Authentication successful for:', user.email)
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          }
+        } catch (error) {
+          console.error('Auth error:', error)
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
         }
       }
     })
