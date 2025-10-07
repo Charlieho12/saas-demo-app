@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Production mode: Use actual Stripe
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Stripe is not configured' },
+        { status: 500 }
+      )
+    }
     
     // Get or create Stripe customer
     let customer = await getStripeCustomer(user.email)

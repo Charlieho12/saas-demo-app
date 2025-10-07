@@ -1,0 +1,13 @@
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build]
+  command = "npx prisma generate && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Handle function timeout for longer database operations
+[functions]
+  timeout = 30
