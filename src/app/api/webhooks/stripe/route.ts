@@ -3,48 +3,63 @@ import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
+// Disable body parsing to get raw body
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
-  console.log('Webhook received - POST method')
-  console.log('Headers:', Object.fromEntries(request.headers.entries()))
+  console.log('🎯 Webhook received - POST method')
+  console.log('🔗 URL:', request.url)
+  console.log('📋 Headers:', Object.fromEntries(request.headers.entries()))
   
-  const body = await request.text()
-  const signature = request.headers.get('stripe-signature')
-
-  console.log('Body length:', body.length)
-  console.log('Signature present:', !!signature)
-
-  if (!signature) {
-    return NextResponse.json(
-      { error: 'No signature found' },
-      { status: 400 }
-    )
-  }
-
-  let event: Stripe.Event
-
   try {
+    const body = await request.text()
+    const signature = request.headers.get('stripe-signature')
+
+    console.log('📦 Body length:', body.length)
+    console.log('✍️ Signature present:', !!signature)
+
+    if (!signature) {
+      console.error('❌ No signature found')
+      return NextResponse.json(
+        { error: 'No signature found' },
+        { status: 400 }
+      )
+    }
+
     if (!stripe) {
-      console.error('Stripe is not configured')
+      console.error('❌ Stripe is not configured')
       return NextResponse.json(
         { error: 'Stripe is not configured' },
         { status: 500 }
       )
     }
 
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
-  } catch (error) {
-    console.error('Webhook signature verification failed:', error)
-    return NextResponse.json(
-      { error: 'Invalid signature' },
-      { status: 400 }
-    )
-  }
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.error('❌ STRIPE_WEBHOOK_SECRET not configured')
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 500 }
+      )
+    }
+    let event: Stripe.Event
 
-  try {
+    try {
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET!
+      )
+      console.log('✅ Webhook signature verified. Event type:', event.type)
+    } catch (error) {
+      console.error('❌ Webhook signature verification failed:', error)
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400 }
+      )
+    }
+
+    // Process the webhook event
+    try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
@@ -169,6 +184,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+} catch (error) {
+  console.error('❌ Webhook handler error:', error)
+  return NextResponse.json(
+    { error: 'Webhook handler failed' },
+    { status: 500 }
+  )
+}
 }
 
 // Add GET method for testing
