@@ -39,11 +39,22 @@ export async function POST(request: NextRequest) {
     const hasValidStripeKeys = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_') && 
                                process.env.STRIPE_PUBLISHABLE_KEY?.startsWith('pk_test_') &&
                                process.env.STRIPE_PRICE_ID?.startsWith('price_') &&
+                               process.env.STRIPE_SECRET_KEY.length > 50 && // Real keys are much longer
+                               process.env.STRIPE_PUBLISHABLE_KEY.length > 50 &&
+                               process.env.STRIPE_PRICE_ID.length > 20 &&
                                !process.env.STRIPE_SECRET_KEY.includes('your_stripe_secret_key') &&
                                !process.env.STRIPE_PUBLISHABLE_KEY.includes('your_stripe_publishable_key') &&
                                !process.env.STRIPE_PRICE_ID.includes('your_price_id')
 
-    if (!hasValidStripeKeys && process.env.NODE_ENV === 'development') {
+    console.log('Stripe environment check:', {
+      hasSecretKey: !!process.env.STRIPE_SECRET_KEY,
+      hasPublishableKey: !!process.env.STRIPE_PUBLISHABLE_KEY,
+      hasPriceId: !!process.env.STRIPE_PRICE_ID,
+      hasValidStripeKeys,
+      nodeEnv: process.env.NODE_ENV
+    })
+
+    if (!hasValidStripeKeys) {
       // Development mode without Stripe: Simulate successful subscription
       console.log('Development mode activated. NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
       

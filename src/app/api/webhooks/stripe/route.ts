@@ -4,8 +4,14 @@ import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
 export async function POST(request: NextRequest) {
+  console.log('Webhook received - POST method')
+  console.log('Headers:', Object.fromEntries(request.headers.entries()))
+  
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
+
+  console.log('Body length:', body.length)
+  console.log('Signature present:', !!signature)
 
   if (!signature) {
     return NextResponse.json(
@@ -163,4 +169,14 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Add GET method for testing
+export async function GET() {
+  console.log('Webhook endpoint accessed via GET')
+  return NextResponse.json({ 
+    status: 'Webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    stripe_configured: !!stripe
+  })
 }
