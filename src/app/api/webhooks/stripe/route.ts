@@ -100,6 +100,48 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'customer.subscription.created': {
+        console.log('🎉 Processing customer.subscription.created event')
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+
+        console.log('Customer ID:', customerId)
+        console.log('Subscription ID:', subscription.id)
+        console.log('Subscription status:', subscription.status)
+
+        // Find user by Stripe customer ID
+        const userWithSubscription = await prisma.user.findFirst({
+          where: { 
+            subscription: {
+              stripeCustomerId: customerId
+            }
+          },
+          include: { subscription: true }
+        })
+
+        if (!userWithSubscription) {
+          console.error('❌ No user found for customer:', customerId)
+          return NextResponse.json({ error: 'User not found' }, { status: 404 })
+        }
+
+        console.log('✅ Found user:', userWithSubscription.email)
+
+        // Update subscription with Stripe data
+        await prisma.subscription.update({
+          where: { userId: userWithSubscription.id },
+          data: {
+            status: 'ACTIVE',
+            stripeSubscriptionId: subscription.id,
+            stripePriceId: subscription.items.data[0]?.price.id,
+            currentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+            currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+          }
+        })
+
+        console.log('✅ Subscription activated for user:', userWithSubscription.email)
+        break
+      }
+
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
