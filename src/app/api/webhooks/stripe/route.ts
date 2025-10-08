@@ -127,16 +127,44 @@ export async function POST(request: NextRequest) {
         console.log('✅ Found user:', userWithSubscription.email)
 
         // Update subscription with Stripe data
-        await prisma.subscription.update({
-          where: { userId: userWithSubscription.id },
-          data: {
-            status: 'ACTIVE',
+        try {
+          // Get the current period from the subscription items
+          const subscriptionItem = subscription.items.data[0]
+          const currentPeriodStart = subscriptionItem?.current_period_start
+          const currentPeriodEnd = subscriptionItem?.current_period_end
+          
+          console.log('📅 Period data from Stripe:', {
+            current_period_start: currentPeriodStart,
+            current_period_end: currentPeriodEnd,
+            subscription_created: subscription.created,
+            subscription_start_date: subscription.start_date
+          })
+          
+          const updateData = {
+            status: 'ACTIVE' as const,
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0]?.price.id,
-            currentPeriodStart: new Date((subscription as any).current_period_start * 1000),
-            currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+            currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart * 1000) : new Date(),
+            currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           }
-        })
+          
+          console.log('📝 Update data:', updateData)
+          
+          const updated = await prisma.subscription.update({
+            where: { userId: userWithSubscription.id },
+            data: updateData
+          })
+          
+          console.log('✅ Subscription updated successfully:', {
+            id: updated.id,
+            status: updated.status,
+            stripeSubscriptionId: updated.stripeSubscriptionId
+          })
+          
+        } catch (updateError) {
+          console.error('❌ Subscription update failed:', updateError)
+          throw updateError
+        }
 
         console.log('✅ Subscription activated for user:', userWithSubscription.email)
         break
@@ -220,9 +248,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Webhook processing error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error('❌ Webhook processing error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      eventType: event?.type,
+      eventId: event?.id,
+      fullError: error
+    })
     return NextResponse.json(
-      { error: 'Webhook processing failed' },
+      { error: 'Webhook processing failed', details: errorMessage },
       { status: 500 }
     )
   }
